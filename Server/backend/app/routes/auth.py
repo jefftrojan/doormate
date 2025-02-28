@@ -3,6 +3,13 @@ from pydantic import BaseModel
 from ..models.user import UserCreate, User, UserLogin, OTPVerify  # Add OTPVerify import
 from ..services.auth import AuthService
 from typing import Dict
+from ..models.user import User
+from ..utils.email import send_verification_email
+from ..schemas.auth import EmailVerificationRequest
+from ..utils.otp import generate_otp
+from ..utils.email_service import EmailService
+from ..utils.otp_storage import store_otp_in_db  # Add this import
+from ..schemas.auth import EmailVerificationRequest
 
 router = APIRouter()
 auth_service = AuthService()
@@ -33,8 +40,11 @@ async def verify_otp(verify_data: VerifyOTPRequest):
             "user": result["user"],
             "success": True
         }
-    except Exception as e:
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        print(f"Verification error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/login")
 async def login(user_data: UserLogin):
@@ -66,4 +76,24 @@ async def regenerate_otp(email: str = Body(...)):
             "email": email
         }
     except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/verify-email")
+async def verify_email(request: EmailVerificationRequest):
+    try:
+        otp = generate_otp()
+        
+        # Store OTP first
+        stored = await store_otp_in_db(request.email, otp)
+        if not stored:
+            raise HTTPException(status_code=500, detail="Failed to store OTP")
+        
+        # Send email if storage successful
+        email_service = EmailService()
+        success = await email_service.send_verification_email(request.email, otp)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to send verification email")
+        
+        return {"success": True, "message": "Verification email sent"}
+    except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

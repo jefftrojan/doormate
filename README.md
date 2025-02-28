@@ -159,7 +159,7 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 
 ## Contact
 
-Project Link: [https://github.com/jefftrojan/doormate](https://github.com/yourusername/doormate)
+Project Link: [https://github.com/jefftrojan/doormate](https://github.com/jefftrojan/doormate)
 
 ## Acknowledgments
 - African Leadership University

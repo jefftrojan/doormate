@@ -18,12 +18,22 @@ class PyObjectId(ObjectId):
     def __modify_schema__(cls, field_schema):
         field_schema.update(type="string")
 
+from typing import Any, Annotated
+from pydantic import BaseModel, ConfigDict, BeforeValidator, Field
+from bson import ObjectId
+from datetime import datetime
+
+# Custom type for ObjectId fields
+PyObjectId = Annotated[str, BeforeValidator(str)]
+
 class DBModelBase(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: str},
+        populate_by_name=True,
+        from_attributes=True
+    )
+
     id: PyObjectId = Field(default_factory=PyObjectId, alias="_id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        json_encoders = {ObjectId: str}
-        populate_by_name = True
-        arbitrary_types_allowed = True

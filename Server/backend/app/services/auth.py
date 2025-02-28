@@ -11,9 +11,10 @@ from ..models.user import UserCreate
 
 from passlib.context import CryptContext
 from ..utils.email_service import EmailService
-
-# Load environment variables
-load_dotenv()
+from typing import Dict, Optional
+from datetime import datetime, timedelta
+from ..utils.otp_storage import verify_stored_otp
+from ..utils.jwt import create_access_token
 
 class AuthService:
     def __init__(self):
@@ -96,9 +97,52 @@ class AuthService:
         to_encode.update({"exp": expire})
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
-    async def verify_otp(self, email: str, otp: str) -> dict:
-        print(f"Verifying OTP for email: {email}, OTP: {otp}")
-        
+    async def verify_otp(self, email: str, otp: str) -> Dict:
+        try:
+            # Find OTP record
+            otp_record = await self.db.otps.find_one({
+                "email": email,
+                "otp": otp,
+                "expires_at": {"$gt": datetime.utcnow()}
+            })
+            
+            print(f"Found OTP record: {otp_record}")
+            
+            if not otp_record:
+                raise ValueError("Invalid or expired OTP")
+
+            # Create user if not exists (for registration flow)
+            user = await self.db.users.find_one({"email": email})
+            if not user and "user_data" in otp_record:
+                user_data = otp_record["user_data"]
+                user_data["verified"] = True
+                user_data["created_at"] = datetime.utcnow()
+                result = await self.db.users.insert_one(user_data)
+                user = await self.db.users.find_one({"_id": result.inserted_id})
+            elif not user:
+                raise ValueError("User not found")
+
+            # Update user verification status
+            await self.db.users.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"email_verified": True}}
+            )
+
+            # Delete used OTP
+            await self.db.otps.delete_many({"email": email})
+
+            # Convert ObjectId to string and create token
+            user["_id"] = str(user["_id"])
+            token = self.create_access_token({"sub": str(user["_id"])})
+            
+            return {
+                "token": token,
+                "user": user
+            }
+        except Exception as e:
+            print(f"Error in verify_otp: {str(e)}")
+            raise ValueError(str(e))
+
         # Find OTP record
         otp_record = await self.db.otps.find_one({
             "email": email,
@@ -176,15 +220,32 @@ class AuthService:
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         return self.pwd_context.verify(plain_password, hashed_password)
 
-    async def login(self, email: str, password: str) -> dict:
+    async def login(self, email: str, password: str = None) -> dict:
         # Find user by email
         user = await self.db.users.find_one({"email": email})
         if not user:
             raise ValueError("Invalid email or password")
 
-        # Verify password
-        if not self.verify_password(password, user["password"]):
-            raise ValueError("Invalid email or password")
+        if password:
+            # Password-based login
+            if not self.verify_password(password, user["password"]):
+                raise ValueError("Invalid email or password")
+        else:
+            # OTP-based login
+            otp = self.generate_otp()
+            await self.db.otps.insert_one({
+                "email": email,
+                "otp": otp,
+                "created_at": datetime.utcnow(),
+                "expires_at": datetime.utcnow() + timedelta(minutes=10)
+            })
+            
+            # Send login OTP email
+            email_sent = await self.email_service.send_otp_email(email, otp, is_registration=False)
+            if not email_sent:
+                raise ValueError("Failed to send login code")
+            
+            return {"message": "OTP sent to email"}
 
         # Convert ObjectId to string
         user["_id"] = str(user["_id"])

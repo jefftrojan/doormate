@@ -1,14 +1,14 @@
-import { Tabs } from 'expo-router';
-import { ThemeProvider } from '@/components/theme-provider';
 import { Stack } from 'expo-router';
+import { AuthProvider } from '../contexts/AuthContext';
 
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <Stack>
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(app)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       </Stack>
-    </ThemeProvider>
+    </AuthProvider>
   );
 }
