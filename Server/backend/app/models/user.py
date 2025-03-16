@@ -59,8 +59,15 @@ class UserResponse(UserBase):
         arbitrary_types_allowed=True,
         json_encoders={ObjectId: str}
     )
-# Add this new model class
+
 class OTPVerify(BaseModel):
     email: EmailStr
     otp: str
+
+class PasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+class InitialPasswordSet(BaseModel):
+    new_password: str = Field(..., min_length=8)
     

@@ -10,11 +10,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-
-// Change the import and component definition
 import { router } from 'expo-router';
 
-export default function LoginScreen() {
+export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar style="dark" />
@@ -36,10 +34,9 @@ export default function LoginScreen() {
             Join the trusted community of student roommates in Rwanda
           </Text>
 
-          // Update the onPress handler for email signup
           <TouchableOpacity 
             style={styles.emailButton}
-            onPress={() => router.push('/(auth)/email-verification')}
+            onPress={() => router.push('/(auth)/Register')}
             activeOpacity={0.8}
           >
             <Text style={styles.emailButtonText}>Sign Up with School Email</Text>
@@ -48,26 +45,26 @@ export default function LoginScreen() {
           <TouchableOpacity 
             style={[styles.googleButton, { opacity: 0.5 }]}
             activeOpacity={0.8}
-            disabled={true}
           >
-            <Image
-              source={require('@/assets/images/google.png')}
+            <Image 
+              source={require('@/assets/images/google.png')} 
               style={styles.googleIcon}
-              resizeMode="contain"
             />
-            <Text style={[styles.googleButtonText, { color: '#999' }]}>
-              Continue with Google (# to do)
-            </Text>
+            <Text style={styles.googleButtonText}>Sign Up with Google</Text>
           </TouchableOpacity>
 
+          <View style={styles.dividerContainer}>
+            <View style={styles.divider} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.divider} />
+          </View>
+
           <TouchableOpacity 
-            style={styles.loginLink}
-            activeOpacity={0.6}
+            style={styles.loginButton}
             onPress={() => router.push('/(auth)/login')}
+            activeOpacity={0.8}
           >
-            <Text style={styles.loginText}>
-              Already have an account? <Text style={styles.loginHighlight}>Log in</Text>
-            </Text>
+            <Text style={styles.loginButtonText}>Log In</Text>
           </TouchableOpacity>
         </View>
 
@@ -177,17 +174,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  loginLink: {
+  loginButton: {
+    backgroundColor: '#91604B',
+    width: '100%',
+    padding: 16,
+    borderRadius: 12,
     marginTop: 24,
-    padding: 8,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
   },
-  loginText: {
+  loginButtonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  divider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 12,
     fontSize: 14,
     color: '#666',
-  },
-  loginHighlight: {
-    color: '#1a2b3c',
-    fontWeight: '600',
   },
   testimonials: {
     marginTop: 40,

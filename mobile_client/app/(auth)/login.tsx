@@ -32,9 +32,10 @@ export default function LoginScreen() {
     try {
       setLoading(true);
       const response = await login(email, password);
-      if (response.token) {
-        router.replace('/(tabs)');  // Navigate to the main app
-      }
+      
+      // Login successful - navigation is handled in the root layout
+      // No need to manually navigate here as the auth state change will trigger navigation
+      
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'An error occurred during login';
@@ -134,7 +135,7 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Don't have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/email-verification')}>
+          <TouchableOpacity onPress={() => router.push('/(auth)/Register')}>
             <Text style={styles.signUpText}>Sign up</Text>
           </TouchableOpacity>
         </View>

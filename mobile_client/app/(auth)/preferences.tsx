@@ -1,173 +1,371 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert,
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  Platform,
+  Slider
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { Button, Slider } from 'react-native-elements';
-import { ThemedView } from '@/components/ThemedView';
-import { ThemedText } from '@/components/ThemedText';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { authService } from '@/services/auth';
-import { TouchableOpacity } from 'react-native';
+import api from '@/services/api';
 
 export default function Preferences() {
-  const { user, updatePreferences } = useAuth();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [preferences, setPreferences] = useState({
-    cleanliness: 0,
-    noiseLevel: 0,
-    studyHabits: '',
-    budget: 300
+    cleanliness: 3, // 1-5 scale
+    noiseLevel: 3, // 1-5 scale
+    sleepSchedule: 'Regular', // Regular, Night Owl, Early Bird
+    studyHabits: 'Moderate', // Light, Moderate, Intense
+    smoking: false,
+    pets: false,
+    budget: {
+      min: 100,
+      max: 500
+    }
   });
 
-  useEffect(() => {
-    const fetchPreferences = async () => {
-      try {
-        setIsLoading(true);
-        if (user?._id) {
-          const response = await authService.getUserPreferences(user._id);
-          setPreferences(response.data);
-        }
-      } catch (err: any) {
-        setError(err.response?.data?.message || 'Failed to load preferences');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const handleSliderChange = (field: 'cleanliness' | 'noiseLevel', value: number) => {
+    setPreferences(prev => ({
+      ...prev,
+      [field]: Math.round(value)
+    }));
+  };
 
-    fetchPreferences();
-  }, [user]);
+  const handleToggle = (field: 'smoking' | 'pets') => {
+    setPreferences(prev => ({
+      ...prev,
+      [field]: !prev[field]
+    }));
+  };
 
-  const handlePreferencesUpdate = async (update: Partial<typeof preferences>) => {
-    try {
-      const newPreferences = { ...preferences, ...update };
-      setPreferences(newPreferences);
-      if (user?._id) {
-        await authService.updatePreferences(user._id, newPreferences);
+  const handleSelectOption = (
+    field: 'sleepSchedule' | 'studyHabits', 
+    value: string
+  ) => {
+    setPreferences(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleBudgetChange = (type: 'min' | 'max', value: number) => {
+    setPreferences(prev => ({
+      ...prev,
+      budget: {
+        ...prev.budget,
+        [type]: Math.round(value)
       }
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update preference');
-    }
+    }));
   };
 
   const handleNext = async () => {
     try {
-      if (!user) {
-        throw new Error('User not found');
-      }
       setIsLoading(true);
-      await authService.updatePreferences(user._id, preferences); // Use local preferences state
-      router.push('/(tabs)');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to update preferences');
+      
+      // Save preferences to server
+      const response = await api.post('/api/preferences/update', preferences);
+      
+      if (response.data.success) {
+        // Navigate to location screen
+        router.push('/(auth)/location');
+      }
+    } catch (error: any) {
+      console.error('Preferences update error:', error);
+      Alert.alert(
+        'Update Failed', 
+        error.response?.data?.message || 'Failed to update preferences'
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleSkip = () => {
+    router.push('/(auth)/location');
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <ThemedView style={styles.content}>
-        <View style={styles.header}>
-          <Button
-            icon={{ name: 'arrow-back', type: 'ionicon', color: '#000' }}
-            type="clear"
-            onPress={() => router.back()}
-          />
-          <ThemedText style={styles.stepText}>Step 3 of 4</ThemedText>
-        </View>
-
-        <ThemedText style={styles.title}>Your Preferences</ThemedText>
-
-        <View style={styles.section}>
-          <ThemedText style={styles.label}>Cleanliness Level</ThemedText>
-          <View style={styles.emojiScale}>
-            {['😫', '🙁', '😐', '🙂', '😊'].map((emoji, index) => (
-              <TouchableOpacity
-                key={index}
-                onPress={() => handlePreferencesUpdate({ cleanliness: index + 1 })}
-                style={[
-                  styles.emojiButton,
-                  preferences.cleanliness === index + 1 && styles.selectedEmoji
-                ]}
-              >
-                <ThemedText style={styles.emoji}>{emoji}</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <ThemedText style={styles.label}>Noise Level</ThemedText>
-          <Slider
-            value={preferences.noiseLevel}
-            onValueChange={value => handlePreferencesUpdate({ noiseLevel: value })}
-            minimumValue={0}
-            maximumValue={100}
-            step={1}
-            thumbStyle={styles.sliderThumb}
-            trackStyle={styles.sliderTrack}
-          />
-          <View style={styles.sliderLabels}>
-            <ThemedText>Quiet</ThemedText>
-            <ThemedText>Noisy</ThemedText>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <ThemedText style={styles.label}>Study Habits</ThemedText>
-          <View style={styles.buttonGroup}>
-            {['Morning', 'Afternoon', 'Night'].map(time => (
-              <TouchableOpacity
-                key={time}
-                style={[
-                  styles.habitButton,
-                  preferences.studyHabits === time.toLowerCase() && styles.selectedButton
-                ]}
-                onPress={() => handlePreferencesUpdate({ studyHabits: time.toLowerCase() })}
-              >
-                <ThemedText style={styles.buttonText}>{time}</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <ThemedText style={styles.label}>Budget Range (Monthly)</ThemedText>
-          <View style={styles.budgetContainer}>
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Your Preferences</Text>
+        <View style={{ width: 24 }} />
+      </View>
+      
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.subtitle}>
+          Tell us about your living preferences to help find your perfect roommate
+        </Text>
+        
+        {/* Cleanliness Preference */}
+        <View style={styles.preferenceSection}>
+          <Text style={styles.sectionTitle}>Cleanliness</Text>
+          <Text style={styles.sectionSubtitle}>How clean do you keep your living space?</Text>
+          
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Relaxed</Text>
             <Slider
-              value={preferences.budget}
-              onValueChange={value => handlePreferencesUpdate({ budget: Math.round(value) })}
-              minimumValue={300}
-              maximumValue={2000}
-              step={50}
-              thumbStyle={styles.sliderThumb}
-              trackStyle={styles.sliderTrack}
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={5}
+              step={1}
+              value={preferences.cleanliness}
+              onValueChange={(value) => handleSliderChange('cleanliness', value)}
+              minimumTrackTintColor="#1E293B"
+              maximumTrackTintColor="#E2E8F0"
+              thumbTintColor="#1E293B"
             />
-            <View style={styles.budgetLabels}>
-              <ThemedText>$300</ThemedText>
-              <ThemedText>${preferences.budget || 300}</ThemedText>
+            <Text style={styles.sliderLabel}>Very Clean</Text>
+          </View>
+          
+          <View style={styles.valueIndicator}>
+            <Text style={styles.valueText}>{preferences.cleanliness}</Text>
+          </View>
+        </View>
+        
+        {/* Noise Level Preference */}
+        <View style={styles.preferenceSection}>
+          <Text style={styles.sectionTitle}>Noise Level</Text>
+          <Text style={styles.sectionSubtitle}>What noise level do you prefer?</Text>
+          
+          <View style={styles.sliderContainer}>
+            <Text style={styles.sliderLabel}>Quiet</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={5}
+              step={1}
+              value={preferences.noiseLevel}
+              onValueChange={(value) => handleSliderChange('noiseLevel', value)}
+              minimumTrackTintColor="#1E293B"
+              maximumTrackTintColor="#E2E8F0"
+              thumbTintColor="#1E293B"
+            />
+            <Text style={styles.sliderLabel}>Lively</Text>
+          </View>
+          
+          <View style={styles.valueIndicator}>
+            <Text style={styles.valueText}>{preferences.noiseLevel}</Text>
+          </View>
+        </View>
+        
+        {/* Sleep Schedule */}
+        <View style={styles.preferenceSection}>
+          <Text style={styles.sectionTitle}>Sleep Schedule</Text>
+          <Text style={styles.sectionSubtitle}>What's your typical sleep schedule?</Text>
+          
+          <View style={styles.optionsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.sleepSchedule === 'Early Bird' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('sleepSchedule', 'Early Bird')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.sleepSchedule === 'Early Bird' && styles.optionTextSelected
+              ]}>Early Bird</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.sleepSchedule === 'Regular' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('sleepSchedule', 'Regular')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.sleepSchedule === 'Regular' && styles.optionTextSelected
+              ]}>Regular</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.sleepSchedule === 'Night Owl' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('sleepSchedule', 'Night Owl')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.sleepSchedule === 'Night Owl' && styles.optionTextSelected
+              ]}>Night Owl</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Study Habits */}
+        <View style={styles.preferenceSection}>
+          <Text style={styles.sectionTitle}>Study Habits</Text>
+          <Text style={styles.sectionSubtitle}>How much do you typically study?</Text>
+          
+          <View style={styles.optionsContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.studyHabits === 'Light' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('studyHabits', 'Light')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.studyHabits === 'Light' && styles.optionTextSelected
+              ]}>Light</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.studyHabits === 'Moderate' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('studyHabits', 'Moderate')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.studyHabits === 'Moderate' && styles.optionTextSelected
+              ]}>Moderate</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.optionButton,
+                preferences.studyHabits === 'Intense' && styles.optionButtonSelected
+              ]}
+              onPress={() => handleSelectOption('studyHabits', 'Intense')}
+            >
+              <Text style={[
+                styles.optionText,
+                preferences.studyHabits === 'Intense' && styles.optionTextSelected
+              ]}>Intense</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Smoking Preference */}
+        <View style={styles.preferenceSection}>
+          <View style={styles.toggleContainer}>
+            <View>
+              <Text style={styles.sectionTitle}>Smoking</Text>
+              <Text style={styles.sectionSubtitle}>Do you smoke?</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={[
+                styles.toggleButton,
+                preferences.smoking && styles.toggleButtonActive
+              ]}
+              onPress={() => handleToggle('smoking')}
+            >
+              <View style={[
+                styles.toggleIndicator,
+                preferences.smoking && styles.toggleIndicatorActive
+              ]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Pets Preference */}
+        <View style={styles.preferenceSection}>
+          <View style={styles.toggleContainer}>
+            <View>
+              <Text style={styles.sectionTitle}>Pets</Text>
+              <Text style={styles.sectionSubtitle}>Do you have or want pets?</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={[
+                styles.toggleButton,
+                preferences.pets && styles.toggleButtonActive
+              ]}
+              onPress={() => handleToggle('pets')}
+            >
+              <View style={[
+                styles.toggleIndicator,
+                preferences.pets && styles.toggleIndicatorActive
+              ]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Budget Range */}
+        <View style={styles.preferenceSection}>
+          <Text style={styles.sectionTitle}>Budget Range (USD)</Text>
+          <Text style={styles.sectionSubtitle}>What's your monthly budget for rent?</Text>
+          
+          <View style={styles.budgetContainer}>
+            <View style={styles.budgetSection}>
+              <Text style={styles.budgetLabel}>Minimum: ${preferences.budget.min}</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={50}
+                maximumValue={preferences.budget.max - 50}
+                step={10}
+                value={preferences.budget.min}
+                onValueChange={(value) => handleBudgetChange('min', value)}
+                minimumTrackTintColor="#E2E8F0"
+                maximumTrackTintColor="#1E293B"
+                thumbTintColor="#1E293B"
+              />
+            </View>
+            
+            <View style={styles.budgetSection}>
+              <Text style={styles.budgetLabel}>Maximum: ${preferences.budget.max}</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={preferences.budget.min + 50}
+                maximumValue={1000}
+                step={10}
+                value={preferences.budget.max}
+                onValueChange={(value) => handleBudgetChange('max', value)}
+                minimumTrackTintColor="#E2E8F0"
+                maximumTrackTintColor="#1E293B"
+                thumbTintColor="#1E293B"
+              />
             </View>
           </View>
         </View>
-
-        {error ? <ThemedText style={styles.errorText}>{error}</ThemedText> : null}
-
+        
         <View style={styles.buttonContainer}>
-          <Button
-            title="Back"
-            type="outline"
-            containerStyle={styles.backButton}
-            onPress={() => router.back()}
-          />
-          <Button
-            title={isLoading ? "Saving..." : "Next"}
-            containerStyle={styles.nextButton}
+          <TouchableOpacity 
+            style={styles.skipButton}
+            onPress={handleSkip}
+          >
+            <Text style={styles.skipButtonText}>Skip</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.nextButton}
             onPress={handleNext}
             disabled={isLoading}
-          />
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.nextButtonText}>Continue</Text>
+            )}
+          </TouchableOpacity>
         </View>
-      </ThemedView>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -175,112 +373,160 @@ export default function Preferences() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  content: {
-    flex: 1,
-    padding: 20,
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 30,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  stepText: {
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  subtitle: {
     fontSize: 16,
-    marginLeft: 10,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 30,
-  },
-  section: {
+  preferenceSection: {
     marginBottom: 24,
   },
-  label: {
+  sectionTitle: {
     fontSize: 16,
-    marginBottom: 12,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  emojiScale: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
   },
-  sliderLabels: {
+  sliderContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  slider: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 10,
+  },
+  sliderLabel: {
+    fontSize: 12,
+    color: '#666',
+    width: 60,
+  },
+  valueIndicator: {
+    alignItems: 'center',
     marginTop: 8,
   },
-  emojiButton: {
-    padding: 10,
-    borderRadius: 25,
+  valueText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
   },
-  selectedEmoji: {
-    backgroundColor: '#f0f0f0',
-  },
-  emoji: {
-    fontSize: 24,
-  },
-  sliderThumb: {
-    width: 20,
-    height: 20,
-    backgroundColor: '#1a2b3c',
-  },
-  sliderTrack: {
-    height: 4,
-  },
-  buttonGroup: {
+  optionsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  socialButton: {
+  optionButton: {
     flex: 1,
     padding: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
     marginHorizontal: 4,
     alignItems: 'center',
   },
-  budgetContainer: {
-    marginTop: 10,
+  optionButtonSelected: {
+    borderColor: '#1E293B',
+    backgroundColor: '#1E293B',
   },
-  budgetLabels: {
+  optionText: {
+    color: '#333',
+  },
+  optionTextSelected: {
+    color: '#fff',
+  },
+  toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  toggleButton: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#E2E8F0',
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#1E293B',
+  },
+  toggleIndicator: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+  },
+  toggleIndicatorActive: {
+    transform: [{ translateX: 20 }],
+  },
+  budgetContainer: {
     marginTop: 8,
   },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
+  budgetSection: {
     marginBottom: 16,
+  },
+  budgetLabel: {
+    fontSize: 14,
+    marginBottom: 8,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 24,
   },
-  backButton: {
+  skipButton: {
     flex: 1,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    alignItems: 'center',
     marginRight: 8,
   },
+  skipButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   nextButton: {
-    flex: 1,
+    flex: 2,
+    backgroundColor: '#1E293B',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
     marginLeft: 8,
   },
-  habitButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  selectedButton: {
-    backgroundColor: '#1a2b3c',
-  },
-  buttonText: {
-    color: '#000',
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

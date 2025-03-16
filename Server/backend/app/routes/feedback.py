@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from ..models.feedback import MatchFeedback
 from ..utils.auth import get_current_user
+from ..database import db  # Add missing import
 from bson import ObjectId
 
 router = APIRouter()
@@ -11,9 +12,14 @@ async def submit_match_feedback(
     current_user = Depends(get_current_user)
 ):
     try:
+        # Validate match exists before submitting feedback
+        match = await db.matching_data.find_one({"_id": ObjectId(feedback.match_id)})
+        if not match:
+            raise HTTPException(status_code=404, detail="Match not found")
+
         # Store feedback
         feedback_data = feedback.dict()
-        feedback_data["user_id"] = current_user["_id"]
+        feedback_data["user_id"] = str(current_user["_id"])  # Convert ObjectId to string
         await db.feedback.insert_one(feedback_data)
 
         # Update matching data with feedback
@@ -22,7 +28,8 @@ async def submit_match_feedback(
             {
                 "$set": {
                     "feedback_rating": feedback.rating,
-                    "match_success": feedback.rating >= 4.0
+                    "match_success": feedback.rating >= 4.0,
+                    "updated_at": datetime.utcnow()  # Add timestamp
                 }
             }
         )

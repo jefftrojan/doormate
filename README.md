@@ -1,9 +1,43 @@
-# DoorMate: AI-Powered Student Roommate Matching Application
+# DoorMate
 
-## Overview
-DoorMate is a mobile application designed to help university students in Rwanda find compatible roommates through an intelligent matching system. The platform combines AI-driven compatibility matching with robust verification features to create safe and successful housing arrangements.
+DoorMate is a comprehensive housing platform that helps students find accommodations and roommates in Kigali, Rwanda.
 
 ## Features
+
+- Voice-enabled AI assistant for housing search
+- Real-time chat with property owners
+- Roommate matching system
+- Property listings with detailed information
+- User authentication and profile management
+- Multi-language support
+
+## Screenshots
+
+### Mobile App Interface
+
+<div align="center">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+    <img src="assets/images/screenshots/login.png" width="250" alt="Login Screen"/>
+    <img src="assets/images/screenshots/home.png" width="250" alt="Home Screen"/>
+    <img src="assets/images/screenshots/chat.png" width="250" alt="Chat Interface"/>
+  </div>
+  
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 20px;">
+    <img src="assets/images/screenshots/voice_assistant.png" width="250" alt="Voice Assistant"/>
+    <img src="assets/images/screenshots/property_details.png" width="250" alt="Property Details"/>
+    <img src="assets/images/screenshots/profile.png" width="250" alt="User Profile"/>
+  </div>
+</div>
+
+### Key Features Showcase
+
+<div align="center">
+  <div style="display: flex; flex-wrap: wrap; gap: 20px; justify-content: center;">
+    <img src="assets/images/screenshots/ai_assistant.png" width="250" alt="AI Assistant"/>
+    <img src="assets/images/screenshots/roommate_matching.png" width="250" alt="Roommate Matching"/>
+    <img src="assets/images/screenshots/map_view.png" width="250" alt="Map View"/>
+  </div>
+</div>
 
 ### Core Functionality
 - Student verification system
@@ -92,6 +126,9 @@ npm run dev
 cd client
 npm start
 ```
+
+
+https://drive.google.com/drive/folders/106fcSgZSLE7lJ4A_IywHvyr50mux8PpK?usp=sharing - Link to the APK file and Demo
 
 ## Project Structure
 ```

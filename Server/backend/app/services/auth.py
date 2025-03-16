@@ -7,7 +7,7 @@ import string
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 from ..utils.dev_email import DevEmailService
-from ..models.user import UserCreate  
+from ..models.user import UserCreate, User
 
 from passlib.context import CryptContext
 from ..utils.email_service import EmailService
@@ -23,7 +23,15 @@ class AuthService:
         mongodb_url = os.getenv("MONGODB_URL")
         client = AsyncIOMotorClient(mongodb_url)
         self.db = client[os.getenv("DATABASE_NAME")]
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        
+        # Update CryptContext to handle bcrypt version error
+        try:
+            self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        except Exception as e:
+            print(f"Warning: Error initializing CryptContext: {str(e)}")
+            # Fallback to a simpler configuration
+            self.pwd_context = CryptContext(schemes=["bcrypt"])
+            
         self.email_service = EmailService()
 
     def generate_otp(self) -> str:
@@ -34,29 +42,24 @@ class AuthService:
         # Check if user exists
         existing_user = await self.db.users.find_one({"email": user_data.email})
         if existing_user:
-            raise ValueError("User already exists")
+            raise ValueError("User with this email already exists")
 
-        # Validate password
-        if len(user_data.password) < 8:
-            raise ValueError("Password must be at least 8 characters long")
+        # Hash the password
+        hashed_password = self.pwd_context.hash(user_data.password)
+        user_data.password = hashed_password
 
-        # Generate and store OTP
+        # Generate OTP
         otp = self.generate_otp()
         print(f"Generated OTP for {user_data.email}: {otp}")
-        
-        # Hash password before storing
-        user_dict = user_data.dict()
-        user_dict["password"] = self.pwd_context.hash(user_data.password)
-        
-        otp_data = {
+
+        # Store OTP in database
+        result = await self.db.otps.insert_one({
             "email": user_data.email,
             "otp": otp,
-            "user_data": user_dict,
+            "user_data": user_data.dict(),
             "created_at": datetime.utcnow(),
             "expires_at": datetime.utcnow() + timedelta(minutes=10)
-        }
-        
-        result = await self.db.otps.insert_one(otp_data)
+        })
         print(f"Stored OTP record with ID: {result.inserted_id}")
         
         # Verify the OTP was stored
@@ -65,8 +68,15 @@ class AuthService:
 
         # Send email using EmailService
         email_sent = await self.email_service.send_otp_email(user_data.email, otp, is_registration=True)
-        if not email_sent:
+        
+        # In development mode, we don't want to fail registration if email sending fails
+        # This allows testing without a working email service
+        is_dev_mode = os.getenv('ENVIRONMENT', 'development') == 'development'
+        if not email_sent and not is_dev_mode:
             raise ValueError("Failed to send verification email")
+        
+        if not email_sent:
+            print(f"Warning: Failed to send verification email to {user_data.email}, but continuing in development mode")
 
         return otp
 
@@ -85,15 +95,24 @@ class AuthService:
 
         # Send email using EmailService
         email_sent = await self.email_service.send_otp_email(email, otp, is_registration=False)
-        if not email_sent:
+        
+        # In development mode, we don't want to fail login if email sending fails
+        # This allows testing without a working email service
+        is_dev_mode = os.getenv('ENVIRONMENT', 'development') == 'development'
+        if not email_sent and not is_dev_mode:
             raise ValueError("Failed to send login code")
+        
+        if not email_sent:
+            print(f"Warning: Failed to send login code to {email}, but continuing in development mode")
 
-        # TODO: Send email with OTP
-        print(f"Login OTP for {email}: {otp}")  # For development
+    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
+        """Verify a password against a hash"""
+        return self.pwd_context.verify(plain_password, hashed_password)
 
     def create_access_token(self, data: dict) -> str:
+        """Create a new JWT token"""
         to_encode = data.copy()
-        expire = datetime.utcnow() + timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES")))
+        expire = datetime.utcnow() + timedelta(minutes=int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)))
         to_encode.update({"exp": expire})
         return jwt.encode(to_encode, self.secret_key, algorithm=self.algorithm)
 
@@ -217,9 +236,6 @@ class AuthService:
 
         return otp
 
-    def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        return self.pwd_context.verify(plain_password, hashed_password)
-
     async def login(self, email: str, password: str = None) -> dict:
         # Find user by email
         user = await self.db.users.find_one({"email": email})
@@ -257,3 +273,15 @@ class AuthService:
             "access_token": access_token,
             "user": user
         }
+
+    async def get_user_by_email(self, email: str):
+        """
+        Retrieve a user by their email address.
+        
+        Args:
+            email: The email address of the user to retrieve.
+            
+        Returns:
+            The user document if found, None otherwise.
+        """
+        return await self.db.users.find_one({"email": email})
