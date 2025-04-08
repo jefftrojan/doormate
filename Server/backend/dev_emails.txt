@@ -1,0 +1,21 @@
+
+==================================================
+To: jeffdauda@alustudent.com
+Subject: Welcome to DoorMate - Verify Your Email
+Content:
+Your verification code is: 249127
+Valid for 10 minutes.
+
+==================================================
+To: test1@example.com
+Subject: Welcome to DoorMate - Verify Your Email
+Content:
+Your verification code is: 556559
+Valid for 10 minutes.
+
+==================================================
+To: jeffreykarau@gmail.com
+Subject: Welcome to DoorMate - Verify Your Email
+Content:
+Your verification code is: 695513
+Valid for 10 minutes.
